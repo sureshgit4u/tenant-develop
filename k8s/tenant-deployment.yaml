@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tenant
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 0%
+  selector:
+    matchLabels:
+      app: tenant
+  template:
+    metadata:
+      labels:
+        app: tenant
+    spec:    
+      containers:
+      - name: tenant
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: aws-deploy
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aws-deploy
+              key:  AWS_SECRET_ACCESS_KEY
+        image: IMAGE
+        imagePullPolicy: Always
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "/mnt/prestop.sh"]
+
+        resources:
+          limits:
+            cpu: 2000m
+            memory: 3000Mi
+          requests:
+            cpu: 200m
+            memory: 1000Mi
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - name: prestop-volume
+          mountPath: /mnt
+      volumes:
+      - name: prestop-volume
+        configMap:
+          name: production-prestop-script-config
+

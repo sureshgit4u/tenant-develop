@@ -1,0 +1,29 @@
+FROM openjdk:11-jre-alpine
+
+RUN echo 'hosts: files mdns4_minimal [NOTFOUND=return] dns mdns4' > /etc/nsswitch.conf
+
+
+RUN apk -v --update add \
+        python \
+        py-pip \
+        groff \
+        less \
+        zip \
+        curl \
+        && \
+    pip install --upgrade awscli==1.14.5 s3cmd==2.0.1 python-magic && \
+    apk -v --purge del py-pip && \
+    rm /var/cache/apk/*
+
+
+ENV AWS_DEFAULT_REGION=ap-south-1
+EXPOSE 8080
+
+ARG DEPENDENCY=target/dependency
+COPY ${DEPENDENCY}/BOOT-INF/lib /app/lib
+COPY ${DEPENDENCY}/META-INF /app/META-INF
+COPY ${DEPENDENCY}/BOOT-INF/classes /app
+
+ADD /src/main/resources/application.properties /application.properties
+
+CMD java -Xms1g -Xmx1g -DLOG_HOME=/var/log/tenant/ -Dspring.jmx.enabled=false -cp app:app/lib/* com.motows.tenant.TenantApplication  --spring.profiles.active=prod --platform.credentials.file=/application.properties --server.port=8080

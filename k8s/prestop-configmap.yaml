@@ -1,0 +1,14 @@
+apiVersion: v1
+data:
+  prestop.sh: |
+    #!/bin/bash
+    DATE=`date '+%Y-%m-%d-%H%M%S'`
+    HOSTNAME=`hostname`
+    APPLOGS="/var/log/tenant/*"
+    zip -r /tmp/${DATE}-${HOSTNAME}.zip ${APPLOGS}
+    SERVICE=`echo $HOSTNAME | cut -d'-' -f -2`
+    aws s3 cp /tmp/${DATE}-${HOSTNAME}.zip s3://production-k8s-prestop-logs/${SERVICE}/
+kind: ConfigMap
+metadata:
+  name: production-prestop-script-config
+  namespace: default
