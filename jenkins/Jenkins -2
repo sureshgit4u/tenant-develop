@@ -1,0 +1,47 @@
+properties([
+	parameters([
+        string(defaultValue: "master", description: 'Which Git Branch to clone?', name: 'GIT_BRANCH'),
+        string(defaultValue: "https://github.com/sureshgit4u/tenant-develop.git", description: 'Git repo name?', name: 'GIT_REPO'),
+        string(defaultValue: "579926917988", description: 'AWS Account Number?', name: 'AWS_ACCOUNT'),
+        string(defaultValue: "tenent-demo", description: 'AWS ECR Repository where built docker images will be pushed.', name: 'AWS_ECR_NAME')
+	])
+])
+
+node {
+    def mvnHome = tool 'M3'
+    stage('Git Checkout') { // for display purposes
+        // Get some code from a GitHub repository
+        //git  'https://github.com/jglick/simple-maven-project-with-tests.git'
+        git branch: "${params.GIT_BRANCH}", url: "${params.GIT_REPO}"
+    }
+    stage('Maven Build') {
+        // Run the maven build
+        withEnv(["MVN_HOME=$mvnHome"]) {
+            if (isUnix()) {
+                sh '"$MVN_HOME/bin/mvn" clean package -Dmaven.test.skip -DskipTests'
+            } else {
+                bat(/"%MVN_HOME%\bin\mvn" clean package -Dmaven.test.skip -DskipTests/)
+            }
+        }
+    }
+    stage('Results') {
+        //junit '**/target/surefire-reports/TEST-*.xml'
+        archiveArtifacts 'target/*.jar'
+    }
+    stage('Dockerized')
+    {
+         // Run the Docker Build
+        def GIT_COMMIT_ID = bat (script: "@echo off | git rev-parse --short HEAD",returnStdout: true).trim()
+        echo "Git commit id: ${GIT_COMMIT_ID}"
+        echo "docker build -t ${params.AWS_ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/${params.AWS_ECR_NAME}:${GIT_COMMIT_ID} ."
+        withEnv(["MVN_HOME=$mvnHome"]) {
+            if (isUnix()) {
+                sh "docker build -t ${params.AWS_ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/${params.AWS_ECR_NAME}:${GIT_COMMIT_ID} ."
+                sh "docker push ${params.AWS_ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/${params.AWS_ECR_NAME}:${GIT_COMMIT_ID}"
+            } else {
+                bat("docker build -t ${params.AWS_ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/${params.AWS_ECR_NAME}:${GIT_COMMIT_ID} .")
+                bat("docker push ${params.AWS_ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/${params.AWS_ECR_NAME}:${GIT_COMMIT_ID}")
+            }
+        }
+    }
+}
